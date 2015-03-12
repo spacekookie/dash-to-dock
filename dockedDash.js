@@ -450,7 +450,7 @@ const dockedDash = new Lang.Class({
 
             let _onNotify = Main.messageTray._onNotify;
             let _hideNotificationCompleted = Main.messageTray._hideNotificationCompleted;
-            this._injectionsHandler.add('insensitive-message-tray',
+            this._injectionsHandler.add(
                 [
                     Main.messageTray,
                     '_onNotify',
@@ -459,21 +459,30 @@ const dockedDash = new Lang.Class({
                         global.log('HIDE');
 
 
-
-                        this._ignoreHover = true;
-                        this._intellihide.disable();
-                        this._removeAnimations();
-                        this._animateOut(this._settings.get_double('animation-time'), 0);
+//                        if( Main.messageTray._trayState == MessageTray.State.HIDDEN) {
+                            this._ignoreHover = true;
+                            this._intellihide.disable();
+                            this._removeAnimations();
+                            this._animateOut(this._settings.get_double('animation-time'), 0);
+//                        }
 
                         notification.connect('destroy', Lang.bind(this, function(){
 
-                        if(Main.messageTray._notificationQueue.length==0) {
-                          global.log('CHECK');
-                          this._ignoreHover = false;
-                          this._intellihide.enable();
-                          this._updateDashVisibility();
-                        } else
-                          global.log('WAIT');
+                            global.log('DESTROY');
+
+                            if( Main.messageTray._notificationQueue.length==0 ) {
+
+                                if (Main.overview.visibleTarget) {
+                                    //force visibility update in overview mode
+                                    this._pageChanged();
+                                } else {
+                                    this._ignoreHover = false;
+                                    this._intellihide.enable();
+                                    this._updateDashVisibility();
+                                }
+                            } else {
+                                //there are other notifications queued, the last will reset the dash visibility
+                            }
 
                         }));
                     })
@@ -483,17 +492,22 @@ const dockedDash = new Lang.Class({
                     '_hideNotificationCompleted',
                     Lang.bind(this, function(){
 
-                        _hideNotificationCompleted.call(Main.messageTray);
+                        global.log('COMPLETED');
 
-                        if(Main.messageTray._notificationQueue.length==0) {
-                          global.log('CHECK');
-                          this._ignoreHover = false;
-                          this._intellihide.enable();
-                          this._updateDashVisibility();
-                        } else
-                          global.log('WAIT');
+                        if( Main.messageTray._notificationQueue.length==0 ) {
 
-                        })
+                            if (Main.overview.visibleTarget) {
+                                //force visibility update in overview mode
+                                this._pageChanged();
+                            } else {
+                                this._ignoreHover = false;
+                                this._intellihide.enable();
+                                this._updateDashVisibility();
+                            }
+                        } else {
+                            //there are other notifications queued, the last will reset the dash visibility
+                        }
+                   })
                 ]
             );
         }
@@ -657,7 +671,7 @@ const dockedDash = new Lang.Class({
      */
     _updateDashVisibility: function() {
 
-        if (Main.overview.visibleTarget)
+        if (Main.overview.visibleTarget || Main.messageTray._notificationState !== MessageTray.State.HIDDEN )
             return;
 
         if ( this._fixedIsEnabled ) {
@@ -1134,6 +1148,12 @@ const dockedDash = new Lang.Class({
     },
 
     _pageChanged: function() {
+
+        global.log(Main.messageTray._notificationState);
+
+        if ( Main.messageTray._notificationState == MessageTray.State.SHOWN 
+             || Main.messageTray._notificationState == MessageTray.State.SHOWING )
+            return;
 
         let activePage = Main.overview.viewSelector.getActivePage();
         let dashVisible = (activePage == ViewSelector.ViewPage.WINDOWS ||
