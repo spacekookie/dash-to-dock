@@ -443,7 +443,6 @@ const dockedDash = new Lang.Class({
 
         if (this._position == St.Side.BOTTOM) {
 
-            //MessageTray.SystemNotificationSource()
             this._dashSpacer.connect('notify::height', Lang.bind(this, function(){
                 Main.overview._controls._indicator.actor.get_children()[0].y = -this._dashSpacer.height;
             }));
@@ -456,19 +455,17 @@ const dockedDash = new Lang.Class({
                     '_onNotify',
                     Lang.bind(this, function(source, notification) {
                         _onNotify.call(Main.messageTray, source, notification);
-                        global.log('HIDE');
 
-
-//                        if( Main.messageTray._trayState == MessageTray.State.HIDDEN) {
+                        // Popups are not shown when the message tray is open.
+                        if( Main.messageTray._trayState == MessageTray.State.HIDDEN) {
                             this._ignoreHover = true;
                             this._intellihide.disable();
                             this._removeAnimations();
                             this._animateOut(this._settings.get_double('animation-time'), 0);
-//                        }
+                        }
 
                         notification.connect('destroy', Lang.bind(this, function(){
 
-                            global.log('DESTROY');
 
                             if( Main.messageTray._notificationQueue.length==0 ) {
 
@@ -492,7 +489,7 @@ const dockedDash = new Lang.Class({
                     '_hideNotificationCompleted',
                     Lang.bind(this, function(){
 
-                        global.log('COMPLETED');
+                        _hideNotificationCompleted.call(Main.messageTray);
 
                         if( Main.messageTray._notificationQueue.length==0 ) {
 
@@ -671,7 +668,7 @@ const dockedDash = new Lang.Class({
      */
     _updateDashVisibility: function() {
 
-        if (Main.overview.visibleTarget || Main.messageTray._notificationState !== MessageTray.State.HIDDEN )
+        if (this._position == St.Side.BOTTOM && ( Main.overview.visibleTarget || Main.messageTray._notificationState !== MessageTray.State.HIDDEN ))
             return;
 
         if ( this._fixedIsEnabled ) {
@@ -1149,10 +1146,9 @@ const dockedDash = new Lang.Class({
 
     _pageChanged: function() {
 
-        global.log(Main.messageTray._notificationState);
-
-        if ( Main.messageTray._notificationState == MessageTray.State.SHOWN 
-             || Main.messageTray._notificationState == MessageTray.State.SHOWING )
+        if ( this._position == St.Side.BOTTOM
+             && (Main.messageTray._notificationState == MessageTray.State.SHOWN
+             || Main.messageTray._notificationState == MessageTray.State.SHOWING ) )
             return;
 
         let activePage = Main.overview.viewSelector.getActivePage();
