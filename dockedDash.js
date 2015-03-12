@@ -808,6 +808,7 @@ const dockedDash = new Lang.Class({
                       Mainloop.source_remove(this._removeBarrierTimeoutId);
                   }
                   this._removeBarrierTimeoutId = Mainloop.timeout_add(100, Lang.bind(this, this._removeBarrier));
+                  this.dash._shownInitially = true;
               })
         });
     },
@@ -826,7 +827,8 @@ const dockedDash = new Lang.Class({
             onOverwrite : Lang.bind(this, function() {this._animStatus.clear();}),
             onComplete: Lang.bind(this, function() {
                     this._animStatus.end();
-                    this._updateBarrier();
+                    this._updateBarrier();  
+                    this.dash._shownInitially = false;
             })
         });
     },
