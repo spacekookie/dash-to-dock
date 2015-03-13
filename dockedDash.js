@@ -427,12 +427,16 @@ const dockedDash = new Lang.Class({
         Main.uiGroup.add_child(this.actor);
         Main.layoutManager._trackActor(this._slider.actor, {trackFullscreen: true});
 
+        // An separated actor is used to trak struts so that I can slide out the dash without changing the struts.
+        // Position and size are linked to this._staticBox and set un _updateStaticBox()
+        this._strutsActor = new Clutter.Actor({reactive: false});
+        Main.layoutManager.uiGroup.add_actor(this._strutsActor);
+        if ( this._settings.get_boolean('dock-fixed') ) {
+          Main.layoutManager._trackActor(this._strutsActor, {affectsStruts: true});
+        }
         // Keep the dash below the modalDialogGroup
         Main.layoutManager.uiGroup.set_child_below_sibling(this.actor,Main.layoutManager.modalDialogGroup);
-
-        if ( this._settings.get_boolean('dock-fixed') )
-          Main.layoutManager._trackActor(this.dash.actor, {affectsStruts: true});
-
+        Main.layoutManager.uiGroup.set_child_below_sibling(this._strutsActor, this.actor);
         // pretend this._slider is isToplevel child so that fullscreen is actually tracked
         let index = Main.layoutManager._findActor(this._slider.actor);
         Main.layoutManager._trackedActors[index].isToplevel = true ;
@@ -552,6 +556,7 @@ const dockedDash = new Lang.Class({
         // Destroy main clutter actor: this should be sufficient removing it and
         // destroying  all its children
         this.actor.destroy();
+        this._strutsActor.destroy();
 
         // Remove barrier timeout
         if (this._removeBarrierTimeoutId > 0)
@@ -600,9 +605,9 @@ const dockedDash = new Lang.Class({
         this._settings.connect('changed::dock-fixed', Lang.bind(this, function(){
 
             if(this._settings.get_boolean('dock-fixed')) {
-                Main.layoutManager._trackActor(this.dash.actor, {affectsStruts: true});
+                Main.layoutManager._trackActor(this._strutsActor, {affectsStruts: true});
             } else {
-                Main.layoutManager._untrackActor(this.dash.actor);
+                Main.layoutManager._untrackActor(this._strutsActor);
             }
 
             this._resetPosition();
@@ -1096,6 +1101,9 @@ const dockedDash = new Lang.Class({
             this._box.width,
             this._box.height
         );
+
+        this._strutsActor.set_position(this.staticBox.x1, this.staticBox.y1 );
+        this._strutsActor.set_size(this.staticBox.x2 - this.staticBox.x1, this.staticBox.y2 - this.staticBox.y1 );
 
         // This prevents an allocation cycle warning. Somehow changing the topbar
         // allocation causes an allocation of the dock actor and thus the cycle I
