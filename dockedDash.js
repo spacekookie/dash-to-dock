@@ -462,7 +462,9 @@ const dockedDash = new Lang.Class({
                             this._ignoreHover = true;
                             this._intellihide.disable();
                             this._removeAnimations();
-                            this._animateOut(this._settings.get_double('animation-time'), 0);
+                            // I use a small delay as there are notifications appearing and
+                            // disapperaing immediately ("New window is ready)
+                            this._animateOut(this._settings.get_double('animation-time'), 0.250);
                         }
 
                         notification.connect('destroy', Lang.bind(this, function(){
