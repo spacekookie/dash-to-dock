@@ -78,6 +78,30 @@ const DashActor = new Lang.Class({
         this.actor.connect('allocate', Lang.bind(this, this._allocate));
 
         this.actor._delegate = this;
+
+        // Popup menu
+        
+        this.menu = new PopupMenu.PopupMenu(this.actor, 0.0, St.Side.RIGHT, 0);
+        this.menu.actor.hide();
+        this.menu.actor.add_style_class_name('panel-menu');
+        let settingsMenuItem = new PopupMenu.PopupMenuItem('Dash to Dock ' + _('Settings'));
+        settingsMenuItem.connect('activate', Lang.bind(this, function() {
+            Util.spawn(['gnome-shell-extension-prefs', Me.metadata.uuid]);
+        }));
+        this.menu.addMenuItem(settingsMenuItem);
+        
+        Main.uiGroup.add_actor(this.menu.actor);
+        this.menu.close();
+
+        this._menuManager = new PopupMenu.PopupMenuManager(this);
+        this._menuManager.addMenu(this.menu);
+
+        this.actor.reactive = true;
+        this.actor.connect('button-press-event', Lang.bind(this, function(actor, event) {
+            if (event.get_state() & Clutter.ModifierType.BUTTON3_MASK) {
+                this.menu.toggle();
+            }
+        }));
     },
 
     _allocate: function(actor, box, flags) {
