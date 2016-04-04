@@ -25,6 +25,7 @@ const Workspace = imports.ui.workspace;
 const Me = imports.misc.extensionUtils.getCurrentExtension();
 const Convenience = Me.imports.convenience;
 const AppIcons = Me.imports.appIcons;
+const Windows = Me.imports.windows;
 
 let DASH_ANIMATION_TIME = DefaultDash.DASH_ANIMATION_TIME;
 let DASH_ITEM_LABEL_HIDE_TIME = DefaultDash.DASH_ITEM_LABEL_HIDE_TIME;
@@ -197,6 +198,7 @@ const baseIconSizes = [16, 22, 24, 32, 48, 64, 96, 128];
  *   ensure actor is visible on keyfocus inseid the scrollview
  * - add 128px icon size, might be usefull for hidpi display
  * - sync minimization application target position.
+ * - support configurable "window stealing"
  */
 const Dash = new Lang.Class({
     Name: 'DashToDock.Dash',
@@ -282,9 +284,9 @@ const Dash = new Lang.Class({
 
         // Update minimization animation target position on allocation of the
         // container and on scrollview change.
-        this._box.connect('notify::allocation', Lang.bind(this, this._updateAppsIconGeometry));
+        this._box.connect('notify::allocation', Lang.bind(this, this._updateAppIcons));
         let scrollViewAdjustment = this._isHorizontal ? this._scrollView.hscroll.adjustment : this._scrollView.vscroll.adjustment;
-        scrollViewAdjustment.connect('notify::value', Lang.bind(this, this._updateAppsIconGeometry));
+        scrollViewAdjustment.connect('notify::value', Lang.bind(this, this._updateAppIcons));
 
         this._workId = Main.initializeDeferredWork(this._box, Lang.bind(this, this._redisplay));
 
@@ -557,10 +559,10 @@ const Dash = new Lang.Class({
       return appIcons;
     },
 
-    _updateAppsIconGeometry: function() {
+    _updateAppIcons: function() {
         let appIcons = this._getAppIcons();
         appIcons.forEach(function(icon) {
-            icon.updateIconGeometry();
+            icon.onWindowsChanged();
         });
     },
 
@@ -857,7 +859,7 @@ const Dash = new Lang.Class({
         this._box.queue_relayout();
 
         // This is required for icon reordering when the scrollview is used.
-        this._updateAppsIconGeometry();
+        this._updateAppIcons();
     },
 
     setIconSize: function(max_size, doNotAnimate) {

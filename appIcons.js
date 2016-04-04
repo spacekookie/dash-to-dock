@@ -24,6 +24,7 @@ const Workspace = imports.ui.workspace;
 
 const Me = imports.misc.extensionUtils.getCurrentExtension();
 const Convenience = Me.imports.convenience;
+const Windows = Me.imports.windows;
 
 let tracker = Shell.WindowTracker.get_default();
 
@@ -122,10 +123,17 @@ const AppIcon = new Lang.Class({
 
         let rect = new Meta.Rectangle();
 
+        if (Windows.isStolen(this.app)) {
+            if (this.actor.child) {
+                this.actor.child.destroy();
+                this.actor.child = null;
+            }
+        }
+
         [rect.x, rect.y] = this.actor.get_transformed_position();
         [rect.width, rect.height] = this.actor.get_transformed_size();
 
-        let windows = this.app.get_windows();
+        let windows = Windows.getAllWindows(this.app);
         windows.forEach(function(w) {
             w.set_icon_geometry(rect);
         });
@@ -217,17 +225,25 @@ const AppIcon = new Lang.Class({
             return;
         }
 
+        let isRunning = Windows.isWindowStealer(this.app) ?
+            Windows.getAllWindows(this.app).length > 0 :
+            this.app.state == Shell.AppState.RUNNING;
+
         let event = Clutter.get_current_event();
         let modifiers = event ? event.get_state() : 0;
         let openNewWindow = modifiers & Clutter.ModifierType.CONTROL_MASK &&
-                            this.app.state == Shell.AppState.RUNNING ||
+                            isRunning ||
                             button && button == 2;
-        let focusedApp = tracker.focus_app;
 
-        if (this.app.state == Shell.AppState.STOPPED || openNewWindow)
+        let focusedApp = tracker.focus_app;
+        let isFocused = Windows.isWindowStealer(this.app) ?
+            Windows.isStealingFrom(this.app, focusedApp) :
+            this.app == focusedApp;
+
+        if (!isRunning || openNewWindow)
             this.animateLaunch();
 
-        if(button && button == 1 && this.app.state == Shell.AppState.RUNNING) {
+        if (button && button == 1 && isRunning) {
             if (modifiers & Clutter.ModifierType.CONTROL_MASK) {
                 // Keep default behaviour: launch new window
                 // By calling the parent method I make it compatible
@@ -252,13 +268,13 @@ const AppIcon = new Lang.Class({
                 // Activate all window of the app or only le last used
                 if (this._dtdSettings.get_enum('click-action') == clickAction.CYCLE_WINDOWS && !Main.overview._shown) {
                     // If click cycles through windows I can activate one windows at a time
-                    let windows = getInterestingWindows(this.app);
+                    let windows = Windows.getInterestingWindows(this.app);
                     let w = windows[0];
                     Main.activateWindow(w);
                 }
                 else if (this._dtdSettings.get_enum('click-action') == clickAction.LAUNCH)
                     this.app.open_new_window(-1);
-                else if (this._dtdSettings.get_enum('click-action') == clickAction.MINIMIZE) {
+                else if(this._dtdSettings.get_enum('click-action') == clickAction.MINIMIZE) {
                     // If click minimizes all, then one expects all windows to be reshown
                     activateAllWindows(this.app, this._dtdSettings);
                 }
@@ -279,7 +295,7 @@ const AppIcon = new Lang.Class({
 
     _updateCounterClass: function() {
         let maxN = 4;
-        this._nWindows = Math.min(getInterestingWindows(this.app).length, maxN);
+        this._nWindows = Math.min(Windows.getInterestingWindows(this.app).length, maxN);
 
         for (let i = 1; i <= maxN; i++) {
             let className = 'running' + i;
@@ -369,7 +385,7 @@ const AppIcon = new Lang.Class({
 
 function minimizeWindow(app, param, settings) {
     // Param true make all app windows minimize
-    let windows = getInterestingWindows(app);
+    let windows = Windows.getInterestingWindows(app);
     let current_workspace = global.screen.get_active_workspace();
     for (let i = 0; i < windows.length; i++) {
         let w = windows[i];
@@ -389,17 +405,17 @@ function minimizeWindow(app, param, settings) {
  */
 function activateAllWindows(app, settings) {
     // First activate first window so workspace is switched if needed.
-    app.activate();
+    if (!Windows.isWindowStealer(app))
+        app.activate();
 
     // then activate all other app windows in the current workspace
-    let windows = getInterestingWindows(app);
+    let windows = Windows.getInterestingWindows(app);
     let activeWorkspace = global.screen.get_active_workspace_index();
 
     if (windows.length <= 0)
         return;
 
     let activatedWindows = 0;
-
 
     for (let i = windows.length - 1; i >= 0; i--) {
         if (windows[i].get_workspace().index() == activeWorkspace) {
@@ -414,7 +430,7 @@ function cycleThroughWindows(app, settings) {
     // since the order changes upon window interaction
     let MEMORY_TIME=3000;
 
-    let app_windows = getInterestingWindows(app);
+    let app_windows = Windows.getInterestingWindows(app);
 
     if (recentlyClickedAppLoopId > 0)
         Mainloop.source_remove(recentlyClickedAppLoopId);
@@ -486,9 +502,19 @@ const MyAppIconMenu = new Lang.Class({
     _redisplay: function() {
         this.parent();
 
+        // steal windows menu
+        this._appendSeparator();
+        this._stealWindowsMenuItem = this._appendMenuItem(_('Steal Windows'));
+        this._stealWindowsMenuItem.connect('activate', Lang.bind(this, function() {
+
+            //let r = Util.spawn(['gnome-shell-extension-prefs', 'dash-to-dock@micxgx.gmail.com']);
+            //global.log('>>>>>>>>>>>> ' + r);
+
+        }));
+
         // quit menu
         let app = this._source.app;
-        let count = getInterestingWindows(app).length;
+        let count = Windows.getInterestingWindows(app).length;
         if ( count > 0) {
             this._appendSeparator();
             let quitFromDashMenuText = '';
@@ -500,7 +526,7 @@ const MyAppIconMenu = new Lang.Class({
             this._quitfromDashMenuItem = this._appendMenuItem(quitFromDashMenuText);
             this._quitfromDashMenuItem.connect('activate', Lang.bind(this, function() {
                 let app = this._source.app;
-                let windows = app.get_windows();
+                let windows = Windows.getAllWindows(app);
                 for (let i = 0; i < windows.length; i++) {
                     this._closeWindowInstance(windows[i])
                 }
