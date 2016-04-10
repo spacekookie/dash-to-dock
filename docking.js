@@ -11,7 +11,6 @@ const Mainloop = imports.mainloop;
 const Params = imports.misc.params;
 
 const Main = imports.ui.main;
-const Dash = imports.ui.dash;
 const IconGrid = imports.ui.iconGrid;
 const Overview = imports.ui.overview;
 const OverviewControls = imports.ui.overviewControls;
@@ -27,7 +26,7 @@ const Me = imports.misc.extensionUtils.getCurrentExtension();
 const Convenience = Me.imports.convenience;
 const Intellihide = Me.imports.intellihide;
 const Theming = Me.imports.theming;
-const MyDash = Me.imports.dash;
+const Dash = Me.imports.dash;
 
 const DOCK_DWELL_CHECK_INTERVAL = 100;
 
@@ -234,7 +233,7 @@ const DockedDash = new Lang.Class({
         this._dockDwellTimeoutId = 0
 
         // Create a new dash object
-        this.dash = new MyDash.MyDash(this._settings);
+        this.dash = new Dash.Dash(this._settings);
 
         // set stored icon size  to the new dash
         Main.overview.dashIconSize = this.dash.iconSize;

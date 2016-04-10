@@ -13,7 +13,7 @@ const Mainloop = imports.mainloop;
 
 const AppDisplay = imports.ui.appDisplay;
 const AppFavorites = imports.ui.appFavorites;
-const Dash = imports.ui.dash;
+const DefaultDash = imports.ui.dash;
 const DND = imports.ui.dnd;
 const IconGrid = imports.ui.iconGrid;
 const Main = imports.ui.main;
@@ -26,9 +26,9 @@ const Me = imports.misc.extensionUtils.getCurrentExtension();
 const Convenience = Me.imports.convenience;
 const AppIcons = Me.imports.appIcons;
 
-let DASH_ANIMATION_TIME = Dash.DASH_ANIMATION_TIME;
-let DASH_ITEM_LABEL_HIDE_TIME = Dash.DASH_ITEM_LABEL_HIDE_TIME;
-let DASH_ITEM_HOVER_TIMEOUT = Dash.DASH_ITEM_HOVER_TIMEOUT;
+let DASH_ANIMATION_TIME = DefaultDash.DASH_ANIMATION_TIME;
+let DASH_ITEM_LABEL_HIDE_TIME = DefaultDash.DASH_ITEM_LABEL_HIDE_TIME;
+let DASH_ITEM_HOVER_TIMEOUT = DefaultDash.DASH_ITEM_HOVER_TIMEOUT;
 
 /**
  * Extend DashItemContainer
@@ -52,8 +52,8 @@ function extendDashItemContainer(dashItemContainer, settings) {
  * - modified chldBox calculations for when 'show-apps-at-top' option is checked
  * - handle horizontal dash
  */
-const MyDashActor = new Lang.Class({
-    Name: 'DashToDock.MyDashActor',
+const DashActor = new Lang.Class({
+    Name: 'DashToDock.DashActor',
 
     _init: function(settings) {
         // a prefix is required to avoid conflicting with the parent class variable
@@ -174,8 +174,8 @@ const baseIconSizes = [16, 22, 24, 32, 48, 64, 96, 128];
  * - add 128px icon size, might be usefull for hidpi display
  * - sync minimization application target position.
  */
-const MyDash = new Lang.Class({
-    Name: 'DashToDock.MyDash',
+const Dash = new Lang.Class({
+    Name: 'DashToDock.Dash',
 
     _init: function(settings) {
         this._maxHeight = -1;
@@ -197,7 +197,7 @@ const MyDash = new Lang.Class({
         this._ensureAppIconVisibilityTimeoutId = 0;
         this._labelShowing = false;
 
-        this._containerObject = new MyDashActor(settings);
+        this._containerObject = new DashActor(settings);
         this._container = this._containerObject.actor;
         this._scrollView = new St.ScrollView({
             name: 'dashtodockDashScrollview',
@@ -218,7 +218,7 @@ const MyDash = new Lang.Class({
         this._container.add_actor(this._scrollView);
         this._scrollView.add_actor(this._box);
 
-        this._showAppsIcon = new Dash.ShowAppsIcon();
+        this._showAppsIcon = new DefaultDash.ShowAppsIcon();
         AppIcons.extendShowAppsIcon(this._showAppsIcon, this._dtdSettings);
         this._showAppsIcon.childScale = 1;
         this._showAppsIcon.childOpacity = 255;
@@ -372,7 +372,7 @@ const MyDash = new Lang.Class({
         DND.addDragMonitor(this._dragMonitor);
 
         if (this._box.get_n_children() == 0) {
-            this._emptyDropTarget = new Dash.EmptyDropTargetItem();
+            this._emptyDropTarget = new DefaultDash.EmptyDropTargetItem();
             this._box.insert_child_at_index(this._emptyDropTarget, 0);
             this._emptyDropTarget.show(true);
         }
@@ -398,7 +398,7 @@ const MyDash = new Lang.Class({
     },
 
     _onDragMotion: function(dragEvent) {
-        let app = Dash.getAppFromSource(dragEvent.source);
+        let app = DefaultDash.getAppFromSource(dragEvent.source);
         if (app == null)
             return DND.DragMotionResult.CONTINUE;
 
@@ -447,7 +447,7 @@ const MyDash = new Lang.Class({
     },
 
     _createAppItem: function(app) {
-        let appIcon = new AppIcons.MyAppIcon(this._dtdSettings, app,
+        let appIcon = new AppIcons.AppIcon(this._dtdSettings, app,
                                              { setSizeManually: true,
                                                showLabel: false });
         if (appIcon._draggable) {
@@ -463,7 +463,7 @@ const MyDash = new Lang.Class({
             this._itemMenuStateChanged(item, opened);
         }));
 
-        let item = new Dash.DashItemContainer();
+        let item = new DefaultDash.DashItemContainer();
 
         extendDashItemContainer(item, this._dtdSettings);
         item.setChild(appIcon.actor);
@@ -896,7 +896,7 @@ const MyDash = new Lang.Class({
     },
 
     handleDragOver: function(source, actor, x, y, time) {
-        let app = Dash.getAppFromSource(source);
+        let app = DefaultDash.getAppFromSource(source);
 
         // Don't allow favoriting of transient apps
         if (app == null || app.is_window_backed())
@@ -957,7 +957,7 @@ const MyDash = new Lang.Class({
             else
                 fadeIn = true;
 
-            this._dragPlaceholder = new Dash.DragPlaceholderItem();
+            this._dragPlaceholder = new DefaultDash.DragPlaceholderItem();
             this._dragPlaceholder.child.set_width (this.iconSize);
             this._dragPlaceholder.child.set_height (this.iconSize / 2);
             this._box.insert_child_at_index(this._dragPlaceholder,
@@ -991,7 +991,7 @@ const MyDash = new Lang.Class({
      * Draggable target interface
      */
     acceptDrop: function(source, actor, x, y, time) {
-        let app = Dash.getAppFromSource(source);
+        let app = DefaultDash.getAppFromSource(source);
 
         // Don't allow favoriting of transient apps
         if (app == null || app.is_window_backed())
@@ -1049,7 +1049,7 @@ const MyDash = new Lang.Class({
     }
 });
 
-Signals.addSignalMethods(MyDash.prototype);
+Signals.addSignalMethods(Dash.prototype);
 
 /**
  * This is a copy of the same function in utils.js, but also adjust horizontal scrolling

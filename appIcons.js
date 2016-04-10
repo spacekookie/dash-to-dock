@@ -53,7 +53,7 @@ let recentlyClickedAppIndex = 0;
  * - Customize click actions.
  * - Update minimization animation target
  */
-const MyAppIcon = new Lang.Class({
+const AppIcon = new Lang.Class({
     Name: 'DashToDock.AppIcon',
     Extends: AppDisplay.AppIcon,
 
