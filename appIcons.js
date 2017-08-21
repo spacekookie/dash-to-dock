@@ -183,9 +183,12 @@ var MyAppIcon = new Lang.Class({
 
         let indicator_style = AppIconIndicators.IndicatorStyle.DEFAULT;
 
-        if (this._dtdSettings.get_boolean('custom-theme-running-dots') ||
-                this._dtdSettings.get_boolean('apply-custom-theme')) {
+        if ((this._dtdSettings.get_boolean('custom-theme-running-dots') ||
+            this._dtdSettings.get_boolean('apply-custom-theme')) &&
+            !this._dtdSettings.get_boolean('unity-backlit-items')) {
             indicator_style = AppIconIndicators.IndicatorStyle.RUNNING_DOTS;
+        } else if (this._dtdSettings.get_boolean('unity-backlit-items')) {
+            indicator_style = AppIconIndicators.IndicatorStyle.GLOSSY_COLORED_BACKLIT;
         }
 
         switch (indicator_style) {
@@ -195,6 +198,10 @@ var MyAppIcon = new Lang.Class({
 
         case AppIconIndicators.IndicatorStyle.RUNNING_DOTS:
             this._indicator = new AppIconIndicators.RunningDotsIndicator(this, this._dtdSettings);
+            break;
+
+        case AppIconIndicators.IndicatorStyle.GLOSSY_COLORED_BACKLIT:
+            this._indicator = new AppIconIndicators.GlossyColoredBacklitIndicator(this, this._dtdSettings);
             break;
         }
 
@@ -311,67 +318,10 @@ var MyAppIcon = new Lang.Class({
         });
     },
 
-    /*_toggleAppIndicators: function() {
-        if (this._dtdSettings.get_boolean('custom-theme-running-dots') || this._dtdSettings.get_boolean('apply-custom-theme'))
-            this._showDots();
-        else
-            this._hideDots();
-
-        let applyGlossyBackground = this._dtdSettings.get_boolean('unity-backlit-items') &&
-                                    !this._dtdSettings.get_boolean('apply-custom-theme');
-
-        if (applyGlossyBackground) {
-            let path = imports.misc.extensionUtils.getCurrentExtension().path;
-            let backgroundStyle = 'background-image: url(\'' + path + '/media/glossy.svg\');' +
-                                  'background-size: contain;'
-            this._iconContainer.get_children()[1].set_style(backgroundStyle)
-        } else {
-            this._iconContainer.get_children()[1].set_style(null);
-        }
-
-        this._updateRunningStyle();
-
-        if (this._dots)
-            this._dots.queue_repaint()
-
-    },*/
-
     _updateRunningStyle: function() {
         // The logic originally in this function has been moved to
         // AppIconIndicatorBase._updateDefaultDot(). However it cannot be removed as
         // it called by the parent constructor.
- 
-        // TODO
-        return;
-
-        // When using workspace isolation, we need to hide the dots of apps with
-        // no windows in the current workspace
-        if (this._dtdSettings.get_boolean('isolate-workspaces') ||
-            this._dtdSettings.get_boolean('isolate-monitors')) {
-            if (this.app.state != Shell.AppState.STOPPED
-                && this.getInterestingWindows().length != 0)
-                this._dot.show();
-            else
-                this._dot.hide();
-        }
-        else
-            this.parent();
-        this._onFocusAppChanged();
-        this._updateCounterClass();
-
-        // Enable / Disable the backlight of running apps
-        if (this.app.state !== Shell.AppState.STOPPED &&
-            this._dtdSettings.get_boolean('unity-backlit-items') === true &&
-            this._dtdSettings.get_boolean('apply-custom-theme') === false &&
-            this.getInterestingWindows().length > 0) {
-            this._enableBacklight();
-
-            // Repaint the dots to make sure they have the correct color
-            if (this._dots)
-                this._dots.queue_repaint();
-        } else {
-            this._disableBacklight();
-        }
     },
 
     popupMenu: function() {
