@@ -1,4 +1,7 @@
 const Clutter = imports.gi.Clutter;
+const GdkPixbuf = imports.gi.GdkPixbuf
+const Gio = imports.gi.Gio;
+const Gtk = imports.gi.Gtk;
 const Lang = imports.lang;
 const Shell = imports.gi.Shell;
 const St = imports.gi.St;
@@ -12,7 +15,8 @@ let tracker = Shell.WindowTracker.get_default();
 
 const IndicatorStyle = {
     DEFAULT: 0,
-    RUNNING_DOTS: 1
+    RUNNING_DOTS: 1,
+    GLOSSY_COLORED_BACKLIT: 2
 };
 
 const MAX_WINDOWS_CLASSES = 4;
@@ -134,11 +138,15 @@ const RunningDotsIndicator = new Lang.Class({
             this._dots.queue_redraw(); //not necessary becuase a redraw occurs triggered by the class style applied I guesss
     },
 
-    _drawCircles: function() {
+    // Return the styles used to draw the dots
+    // This function can be replaced in inheriting classes
+    _getDotsStyle: function() {
+        let borderColor, borderWidth, bodyColor, radius, padding, spacing;
 
+        // TODO this is a bit duplicated also inside _drawCircles
         let area = this._dots;
         let side =  Utils.getPosition(this._settings);
-        let borderColor, borderWidth, bodyColor;
+        let [width, height] = area.get_surface_size();
 
         if (!this._settings.get_boolean('apply-custom-theme')
             && this._settings.get_boolean('custom-theme-running-dots')
@@ -156,15 +164,26 @@ const RunningDotsIndicator = new Lang.Class({
             bodyColor = themeNode.get_background_color();
         }
 
+        // Define the radius as an arbitrary size, but keep large enough to account
+        // for the drawing of the border.
+        radius = Math.max(width/22, borderWidth/2);
+        padding = 0; // distance from the margin
+        spacing = radius + borderWidth; // separation between the dots
+
+        return [borderColor, borderWidth, bodyColor, radius, padding, spacing];
+    },
+
+    _drawCircles: function() {
+
+        let area = this._dots;
+        let side =  Utils.getPosition(this._settings);
+
+        let [borderColor, borderWidth, bodyColor, radius, padding, spacing] = this._getDotsStyle();
+
         let [width, height] = area.get_surface_size();
         let cr = area.get_context();
 
         // Draw the required numbers of dots
-        // Define the radius as an arbitrary size, but keep large enough to account
-        // for the drawing of the border.
-        let radius = Math.max(width/22, borderWidth/2);
-        let padding = 0; // distance from the margin
-        let spacing = radius + borderWidth; // separation between the dots
 
         let n = this._nWindows;
 
@@ -241,7 +260,55 @@ const GlossyColoredBacklitIndicator = new Lang.Class({
 
     _init: function(source, settings) {
 
-        this.parent(source, settings)
+        this.parent(source, settings);
+
+        // Apply glossy background
+        // TODO: move to enable/disableBacklit to apply itonly to the running apps?
+        // TODO: move to css class for theming support
+        let path = imports.misc.extensionUtils.getCurrentExtension().path;
+        let backgroundStyle = 'background-image: url(\'' + path + '/media/glossy.svg\');' +
+                              'background-size: contain;';
+        this._source._iconContainer.get_children()[1].set_style(backgroundStyle);
+    },
+
+    update: function() {
+        this.parent();
+
+        // Enable / Disable the backlight of running apps
+        if (this._isRunning) {
+            this._enableBacklight();
+
+        // TODO DO we need this!?
+        // Repaint the dots to make sure they have the correct color
+        if (this._dots)
+            this._dots.queue_repaint();
+        } else {
+            this._disableBacklight();
+        }
+    },
+
+    _getDotsStyle: function() {
+
+        let [borderColor, borderWidth, bodyColor, radius, padding, spacing] =  this.parent()
+
+        // TODO: duplicated in enableBacklight but cached...
+        let colorPallete = this._calculateColorPalette();
+
+        // SLightly adjust the styling
+        padding = 1.45;
+        borderWidth = 2;
+
+        if (colorPallete !== null) {
+            borderColor = Clutter.color_from_string(colorPallete.lighter)[1] ;
+            bodyColor = Clutter.color_from_string(colorPallete.darker)[1];
+        } else {
+            // Fallback
+            borderColor = Clutter.color_from_string('white')[1];
+            bodyColor = Clutter.color_from_string('gray')[1];
+        }
+
+        return [borderColor, borderWidth, bodyColor, radius, padding, spacing];
+
     },
 
     _enableBacklight: function() {
@@ -249,39 +316,27 @@ const GlossyColoredBacklitIndicator = new Lang.Class({
 
         // Fallback
         if (colorPallete === null) {
-            this._iconContainer.set_style(
+            this._source._iconContainer.set_style(
                 'border-radius: 5px;' +
                 'background-gradient-direction: vertical;' +
                 'background-gradient-start: #e0e0e0;' +
                 'background-gradient-end: darkgray;'
             );
 
-            this._dot.set_style(
-                'height: 0px;' +
-                'border: 0px solid white;' +
-                'background-color: gray;'
-            );
-
-            return;
+           return;
         }
 
-        this._iconContainer.set_style(
+        this._source._iconContainer.set_style(
             'border-radius: 5px;' +
             'background-gradient-direction: vertical;' +
             'background-gradient-start: ' + colorPallete.original + ';' +
             'background-gradient-end: ' +  colorPallete.darker + ';'
         );
 
-        this._dot.set_style(
-            'height: 0px;' +
-            'border: 0px solid ' + colorPallete.lighter  + ';' +
-            'background-color: ' + colorPallete.darker + ';'
-        );
     },
 
     _disableBacklight: function() {
-        this._iconContainer.set_style(null);
-        this._dot.set_style(null);
+        this._source._iconContainer.set_style(null);
     },
 
     /**
@@ -325,9 +380,9 @@ const GlossyColoredBacklitIndicator = new Lang.Class({
      * so it more or less works the same way.
      */
     _calculateColorPalette: function() {
-        if (iconCacheMap.get(this.app.get_id())) {
+        if (iconCacheMap.get(this._source.app.get_id())) {
             // We already know the answer
-            return iconCacheMap.get(this.app.get_id());
+            return iconCacheMap.get(this._source.app.get_id());
         }
 
         let pixBuf = this._getIconPixBuf();
@@ -414,7 +469,7 @@ const GlossyColoredBacklitIndicator = new Lang.Class({
             }
         }
 
-        iconCacheMap.set(this.app.get_id(), backgroundColor);
+        iconCacheMap.set(this._source.app.get_id(), backgroundColor);
 
         return backgroundColor;
     },
@@ -448,6 +503,10 @@ const GlossyColoredBacklitIndicator = new Lang.Class({
     },
 
     destroy: function() {
+        this._disableBacklight();
+        // Remove glossy background
+        this._source._iconContainer.get_children()[1].set_style(null);
+
         this.parent();
     }
 });
