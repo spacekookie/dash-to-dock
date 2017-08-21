@@ -32,6 +32,7 @@ const Workspace = imports.ui.workspace;
 const Me = imports.misc.extensionUtils.getCurrentExtension();
 const Utils = Me.imports.utils;
 const WindowPreview = Me.imports.windowPreview;
+const AppIconIndicators = Me.imports.appIconIndicators;
 
 let tracker = Shell.WindowTracker.get_default();
 
@@ -98,9 +99,11 @@ var MyAppIcon = new Lang.Class({
         this._dtdSettings = settings;
         this.monitorIndex = monitorIndex;
         this._signalsHandler = new Utils.GlobalSignalsHandler();
-        this._nWindows = 0;
+        this._indicator = null;
 
         this.parent(app, iconParams);
+
+        this._updateIndicatorStyle();
 
         // Monitor windows-changes instead of app state.
         // Keep using the same Id and function callback (that is extended)
@@ -109,7 +112,7 @@ var MyAppIcon = new Lang.Class({
             this._stateChangedId = 0;
         }
 
-        this._stateChangedId = this.app.connect('windows-changed',
+        this._windowsChangedId = this.app.connect('windows-changed',
                                                 Lang.bind(this,
                                                           this.onWindowsChanged));
         this._focusAppChangeId = tracker.connect('notify::focus-app',
@@ -145,11 +148,9 @@ var MyAppIcon = new Lang.Class({
             this._signalsHandler.add([
                 this._dtdSettings,
                 'changed::' + key,
-                Lang.bind(this, this._toggleAppIndicators)
+                Lang.bind(this, this._updateIndicatorStyle)
             ]);
         }, this);
-
-        this._toggleAppIndicators();
 
         this._dtdSettings.connect('changed::scroll-action', Lang.bind(this, function() {
             this._optionalScrollCycleWindows();
@@ -172,7 +173,11 @@ var MyAppIcon = new Lang.Class({
             this._menu.close(false);
 
         // Disconect global signals
-        // stateChangedId is already handled by parent)
+
+        if (this._windowsChangedId > 0)
+            this.app.disconnect(this._windowsChangedId);
+        this._windowsChangedId = 0;
+
         if (this._focusAppChangeId > 0) {
             tracker.disconnect(this._focusAppChangeId);
             this._focusAppChangeId = 0;
@@ -182,6 +187,36 @@ var MyAppIcon = new Lang.Class({
 
         if (this._scrollEventHandler)
             this.actor.disconnect(this._scrollEventHandler);
+
+        this._indicator.destroy();
+    },
+
+    // TOOD Rename this function
+    _updateIndicatorStyle: function() {
+
+        if (this._indicator !== null) {
+            this._indicator.destroy();
+            this._indicator = null;
+        }
+
+        let indicator_style = AppIconIndicators.IndicatorStyle.DEFAULT;
+
+        if (this._dtdSettings.get_boolean('custom-theme-running-dots') ||
+                this._dtdSettings.get_boolean('apply-custom-theme')) {
+            indicator_style = AppIconIndicators.IndicatorStyle.RUNNING_DOTS;
+        }
+
+        switch (indicator_style) {
+        case AppIconIndicators.IndicatorStyle.DEFAULT:
+            this._indicator = new AppIconIndicators.AppIconIndicatorBase(this, this._dtdSettings);
+            break;
+
+        case AppIconIndicators.IndicatorStyle.RUNNING_DOTS:
+            this._indicator = new AppIconIndicators.RunningDotsIndicator(this, this._dtdSettings);
+            break;
+        }
+
+        this._indicator.update();
     },
 
     _onWindowEntered: function(metaScreen, monitorIndex, metaWin) {
@@ -198,7 +233,6 @@ var MyAppIcon = new Lang.Class({
 
         let isEnabled = this._dtdSettings.get_enum('scroll-action') === scrollAction.CYCLE_WINDOWS;
         if (!isEnabled) return;
-
         this._scrollEventHandler = this.actor.connect('scroll-event', Lang.bind(this,
                                                           this.onScrollEvent));
     },
@@ -263,7 +297,7 @@ var MyAppIcon = new Lang.Class({
         if (this._menu && this._menu.isOpen)
             this._menu.update();
 
-        this._updateRunningStyle();
+        this._indicator.update();
         this.updateIconGeometry();
     },
 
@@ -295,7 +329,7 @@ var MyAppIcon = new Lang.Class({
         });
     },
 
-    _toggleAppIndicators: function() {
+    /*_toggleAppIndicators: function() {
         if (this._dtdSettings.get_boolean('custom-theme-running-dots') || this._dtdSettings.get_boolean('apply-custom-theme'))
             this._showDots();
         else
@@ -318,35 +352,16 @@ var MyAppIcon = new Lang.Class({
         if (this._dots)
             this._dots.queue_repaint()
 
-    },
-
-    _showDots: function() {
-        // I use opacity to hide the default dot because the show/hide function
-        // are used by the parent class.
-        this._dot.opacity = 0;
-
-        // Just update style if dots already exist
-        if (this._dots) {
-            this._updateCounterClass();
-            return;
-        }
-
-        this._dots = new St.DrawingArea({x_expand: true, y_expand: true});
-        this._dots.connect('repaint', Lang.bind(this, function() {
-            this._drawCircles(this._dots, Utils.getPosition(this._dtdSettings));
-        }));
-        this._iconContainer.add_child(this._dots);
-        this._updateCounterClass();
-    },
-
-    _hideDots: function() {
-        this._dot.opacity = 255;
-        if (this._dots)
-            this._dots.destroy()
-        this._dots = null;
-    },
+    },*/
 
     _updateRunningStyle: function() {
+        // The logic originally in this function has been moved to
+        // AppIconIndicatorBase._updateDefaultDot(). However it cannot be removed as
+        // it called by the parent constructor.
+ 
+        // TODO
+        return;
+
         // When using workspace isolation, we need to hide the dots of apps with
         // no windows in the current workspace
         if (this._dtdSettings.get_boolean('isolate-workspaces') ||
@@ -427,12 +442,7 @@ var MyAppIcon = new Lang.Class({
     },
 
     _onFocusAppChanged: function() {
-        // We need to check the number of windows, as the focus might be
-        // happening on another monitor if using isolation
-        if (tracker.focus_app == this.app && this.getInterestingWindows().length != 0)
-            this.actor.add_style_class_name('focused');
-        else
-            this.actor.remove_style_class_name('focused');
+        this._indicator.update();
     },
 
     activate: function(button) {
