@@ -504,8 +504,9 @@ const GlossyColoredBacklitIndicator = new Lang.Class({
 
     destroy: function() {
         this._disableBacklight();
-        // Remove glossy background
-        this._source._iconContainer.get_children()[1].set_style(null);
+        // Remove glossy background if the children still exists
+        if (this._source._iconContainer.get_children().length > 1)
+            this._source._iconContainer.get_children()[1].set_style(null);
 
         this.parent();
     }
